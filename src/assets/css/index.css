@@ -1,0 +1,94 @@
+.card-body h5 {
+    white-space: nowrap;
+}
+
+:root {
+}
+
+input[type="file"] {
+    display: none;
+}
+
+.controls-section {
+    display: flex;
+    flex-direction: row;
+    margin-bottom: 12px;
+}
+
+.controls-section .btn {
+    width: 120px;
+    box-sizing: content-box;
+    margin: 0;
+}
+
+.upload-file-button {
+    display: flex;
+    flex-direction: row;
+    margin-right: 12px;
+}
+
+.file-indicator {
+ padding: 6px;
+ border: 1px solid lightgray;
+ border-radius: 3px 0 0 3px;
+ width: 200px;
+ text-align: center;
+ text-overflow: ellipsis;
+ overflow: hidden;
+}
+
+.custom-file-upload {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+}
+
+.filler {
+   flex: 1 1 0;
+}
+
+
+label.form-control {
+    min-height: 38px;
+}
+
+fieldset[disabled] label.form-control {
+    background-color: #e9ecef;
+}
+
+.image-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.image-wrapper img {
+    width: auto;
+    max-height: 100%;
+    height: auto;
+    max-width: 100%;
+}
+
+.logo {
+    max-width: 600px;
+    height: 120px;
+    margin-top: 20px;
+}
+.mt-10{
+    margin-top: 7%;
+}
+
+.loading-panel {
+    position: fixed;
+    background-color: rgba(0, 0, 0, 0.6);
+    width: 100%;
+    height: 100%;
+    z-index: 111;
+}
+
+.loading-panel svg {
+    position: absolute;
+    transform: translate(-50%);
+    left: 50%;
+    top: 50%;
+}
