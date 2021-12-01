@@ -1,12 +1,12 @@
-import Web3 from "web3";
+// import * as Web3 from '@solana/web3.js';
 
-export const getWeb3 = () => {
-    let web3;
-    if (window.ethereum) {
-        web3 = new Web3(window.ethereum);
-    }
-    else if (window.web3) {
-        web3 = new Web3(window.web3);
-    }
-    return web3;
-}
+// export const getWeb3 = () => {
+//     let web3;
+//     if (window.solana) {
+//         web3 = new Web3(window.solana);
+//     }
+//     else if (window.web3) {
+//         web3 = new Web3(window.web3);
+//     }
+//     return web3;
+// }
