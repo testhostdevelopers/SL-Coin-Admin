@@ -1,7 +1,7 @@
 {
     "CLUSTER": "devnet",
-    "SigAddress": "C1TPnGRD3ixrGoaGyKqmWVbkW4P7s6ZTmhj7FNEUiA5Z",
-    "TOKEN": "65gJn7bKaCyCtbHJir71GeDUm2knrKTonTEiNut7FUkK",
-    "TOKEN_ACCOUNT": "AGzjUnS4ncUDuZ5TvsCde4UfCvVq2jHTcqBJoZGPUTSQ",
-    "OWNERS" : ["C9KYMRzLPLY4UPUGvqx4yF1JdtsEwbm5RyuVK5fh1uTM","7vMgBK6xvHcjKgZ7vDBjcNrSZZuJk7TSzWrA9xNr5Fwf","2EKkskpQ7xXBjVXx4sVibhaonodaczG8qd2fFGFxw6va"]
+    "SigAddress": "y8NeQJQfK9B6gougLNgP775HK6DDhbgFUKS8pe91X8b",
+    "TOKEN": "AA1SM4BpEv9QRnWGeriD92HFegb3VXnKm3ENru7n2a4F",
+    "TOKEN_ACCOUNT": "9PSFCayPEDkJpTHPpehRiTFhY5ps9DvdqkcUJRMdGB4P",
+    "OWNERS" : ["Dgsw86s5mP7uzWoH7F7LusmE7K5VzP4Qq3tLMY5j9Gma","C9KYMRzLPLY4UPUGvqx4yF1JdtsEwbm5RyuVK5fh1uTM","B7mGBM3LbzWQQ3KGtig65YBfXXrZieLiSaCXoBWjoQdW"]
 }

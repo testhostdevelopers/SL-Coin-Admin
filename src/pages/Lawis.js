@@ -6,9 +6,9 @@ import logo from '../assets/media/logos/logo.png'
 // import {getWeb3} from "../utility/getWeb3.js"
 import Loading from "./Loading.js";
 import config from "./config.json";
-import signer1 from "../contracts/signer1.json";
-import signer2 from "../contracts/signer2.json";
-import signer3 from "../contracts/signer3.json";
+import signer1 from "../contracts/signer-1.json";
+import signer2 from "../contracts/signer-2.json";
+import signer3 from "../contracts/signer-3.json";
 // import Wallet from '@solana/wallet-adapter-wallets';
 // import * as Web3 from '@solana/web3.js';
 const web3 = require('@solana/web3.js');
@@ -144,10 +144,10 @@ const Lawis = () => {
                 return;
             }
 
-        //     if (!web3.utils.isAddress(transferAddress)) {
-        //         NotificationManager.warning("Please enter correct address!", "Warning");
-        //         return;
-        //     }
+            if (!transferAddress) {
+                NotificationManager.warning("Please enter correct address!", "Warning");
+                return;
+            }
 
             if (transferAmount <= 0) {
                 NotificationManager.warning("Please enter correct amount!", "Warning");
@@ -156,11 +156,36 @@ const Lawis = () => {
 
             setIsLoading(true);
             try{
-                const token = new splToken.Token(connection, TOKEN_ACCOUNT_ID, TOKEN_PROGRAM_ID, signer1Keypair);
-                console.log(token)
-                console.log(MULTI_SIG_ID, new web3.PublicKey(ownerAddress), new web3.PublicKey(ownerAddress), [signer1Keypair, signer2Keypair, signer3Keypair], transferAmount )
-                const delegate = new web3.PublicKey(0);
-                await token.approve(TOKEN_ACCOUNT_ID, delegate, new web3.PublicKey(ownerAddress), [signer1Keypair, signer2Keypair, signer3Keypair], transferAmount*1 );
+
+                var myToken = new splToken.Token(
+                    connection,
+                    TOKEN_PROGRAM_ID,
+                    splToken.TOKEN_PROGRAM_ID,
+                    signer1Keypair
+                );
+                // const token = new splToken.Token(connection, TOKEN_ACCOUNT_ID, TOKEN_PROGRAM_ID, signer1Keypair);
+                const fromTokenAccount = await myToken.getOrCreateAssociatedAccountInfo(
+                    new web3.PublicKey('Dgsw86s5mP7uzWoH7F7LusmE7K5VzP4Qq3tLMY5j9Gma')
+                  )
+                const toTokenAccount = await myToken.getOrCreateAssociatedAccountInfo(
+                    new web3.PublicKey(transferAddress)
+                )
+                console.log( fromTokenAccount.address.toString() , new web3.PublicKey(transferAddress).toString(), new web3.PublicKey('Dgsw86s5mP7uzWoH7F7LusmE7K5VzP4Qq3tLMY5j9Gma').toString(), [signer1Keypair, signer2Keypair], transferAmount*1)
+                let airdropSignature = await connection.requestAirdrop(
+                    new web3.PublicKey('Dgsw86s5mP7uzWoH7F7LusmE7K5VzP4Qq3tLMY5j9Gma'),
+                    web3.LAMPORTS_PER_SOL,
+                );
+                console.log(await myToken.getMultisigInfo(new web3.PublicKey('y8NeQJQfK9B6gougLNgP775HK6DDhbgFUKS8pe91X8b')))
+                await connection.confirmTransaction(airdropSignature);
+                let transaction = new web3.Transaction();
+                transaction.add(web3.SystemProgram.transfer({
+                    fromPubkey: fromTokenAccount.publicKey,
+                    toPubkey: toTokenAccount.publicKey,
+                    lamports: 1000,
+                }));
+                await web3.sendAndConfirmTransaction(connection, transaction,  [signer1Keypair, signer2Keypair])
+                // const approve = await myToken.approve( fromTokenAccount.address , new web3.PublicKey(transferAddress), new web3.PublicKey('Dgsw86s5mP7uzWoH7F7LusmE7K5VzP4Qq3tLMY5j9Gma'), [signer1Keypair, signer2Keypair], transferAmount*1 );
+          
                 // await cloria.methods.approve(SigAddress, web3.utils.toWei(transferAmount.toString(), "mwei")).
                 // send({ from : ownerAddress })
                 // .on('receipt', async(receipt) => {
