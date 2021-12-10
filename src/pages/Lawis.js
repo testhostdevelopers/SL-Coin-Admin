@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react'
 import { NotificationContainer, NotificationManager } from 'react-notifications'
+import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import logo from '../assets/media/logos/logo.png'
 // import CryptoLoria from "../contracts/CryptoLoria.json";
 // import CryptoLoriaSig from "../contracts/CryptoLoriaSig.json";
 // import {getWeb3} from "../utility/getWeb3.js"
+import * as anchor from '@project-serum/anchor';
 import Loading from "./Loading.js";
 import config from "./config.json";
 import signer1 from "../contracts/signer-1.json";
@@ -11,17 +13,29 @@ import signer2 from "../contracts/signer-2.json";
 import signer3 from "../contracts/signer-3.json";
 // import Wallet from '@solana/wallet-adapter-wallets';
 // import * as Web3 from '@solana/web3.js';
-const web3 = require('@solana/web3.js');
-const splToken = require('@solana/spl-token');
+import {
+    Program, Provider, web3
+} from '@project-serum/anchor';
+import { useWallet } from '@solana/wallet-adapter-react';
 
+import multiSigIdl from '../contracts/idl/multi_sig.json';
+
+require('@solana/wallet-adapter-react-ui/styles.css');
+
+const splToken = require('@solana/spl-token');
+const opts = {
+    preflightCommitment: "processed"
+}
 // const anchor = require("@project-serum/anchor");
 // const assert = require("assert");
 
 const { SigAddress, TOKEN, OWNERS, CLUSTER, TOKEN_ACCOUNT } = config;
 
-const TOKEN_PROGRAM_ID = new web3.PublicKey(TOKEN);
-const TOKEN_ACCOUNT_ID = new web3.PublicKey(TOKEN_ACCOUNT);
+const TOKEN_PROGRAM_ID = splToken.TOKEN_PROGRAM_ID;
+const TOKEN_MINT_ADDRESS = new web3.PublicKey(TOKEN);
+const TOKEN_ACCOUNT_ADDRESS = new web3.PublicKey(TOKEN_ACCOUNT);
 const MULTI_SIG_ID = new web3.PublicKey(SigAddress);
+const multisigProgramID = new web3.PublicKey(multiSigIdl.metadata.address);
 const Lawis = () => {
 
 
@@ -35,7 +49,7 @@ const Lawis = () => {
     // const [isMultipleTransfering, setIsMultipleTranfering] = useState(false);
     // const [isMultipleDeclining, setIsMultipleDeclining] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
-
+    const [multisigProgram, setMultisigProgram] = useState();
     const [transferAddress, setTransferAddress] = useState('');
     const [transferAmount, setTransferAmount] = useState('');
     // const [itemRequested, setItemRequested] = useState(false);
@@ -46,6 +60,7 @@ const Lawis = () => {
     const [airDropList, setAirDropList] = useState([]);
     const [transferedList, setTransferedList] = useState([]);
     // const [requestBurn, setReqeustBurn] = useState(false);
+    const [endTransferRequestIdx, setEndTransferRequestIdx] = useState();
     const [airDropped, setAirDropped] = useState([]);
     const [isConnected, setIsConnected] = useState(false);
     const [endTransferRequest, setEndTransferRequest] = useState('');
@@ -54,246 +69,305 @@ const Lawis = () => {
     const [decBurnNumber, setDecBurnNumber] = useState('');
     const [web3Provider, setWeb3Provider] = useState(null);
     const [connection, setConnection] = useState(null);
-    
+    const [starlightToken, setStarlightToken] = useState(null);
     const signer1SecretKey = new Uint8Array(signer1);
     const signer1Keypair = web3.Keypair.fromSecretKey(signer1SecretKey);
+    const fromWallet = signer1Keypair;
     const signer2SecretKey = new Uint8Array(signer2);
     const signer2Keypair = web3.Keypair.fromSecretKey(signer2SecretKey);
     const signer3SecretKey = new Uint8Array(signer3);
     const signer3Keypair = web3.Keypair.fromSecretKey(signer3SecretKey);
+    const wallet = useWallet();
 
-    const getProvider = () => {
-        if ("solana" in window) {
-            const provider = window.solana;
-            if (provider.isPhantom) {
-                console.log("Is Phantom installed?  ", provider.isPhantom);
-                return provider;
-            }
-        } else {
-            window.open("https://www.phantom.app/", "_blank");
-        }
+    const getProvider = async () => {
+        /* create the provider and return it to the caller */
+        /* network set to local network for now */
+        const network = process.env.REACT_APP_RPC_ENDPOINT;
+        const _connection = new web3.Connection(network, opts.preflightCommitment);
+        setConnection(_connection);
 
+        const provider = new Provider(
+            _connection, wallet, opts.preflightCommitment,
+        );
+        return provider;
     }
 
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    useEffect(async () => {
+        console.log(wallet)
+        setIsConnected(wallet.connected)
+        if (wallet.connected) {
+            setOwnerAddress(wallet.publicKey);
+            const p = await getProvider();
+            setWeb3Provider(p);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [wallet.connected]);
+
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     useEffect(async () => {
         if (isConnected) {
             setTokenAddress(TOKEN);
+            const provider = await getProvider()
+            /* create the program interface combining the idl, program ID, and provider */
+            const _program = new Program(multiSigIdl, multisigProgramID, provider);
+            setMultisigProgram(_program);
+            const _token = new splToken.Token(
+                connection,
+                TOKEN_MINT_ADDRESS,
+                splToken.TOKEN_PROGRAM_ID,
+                fromWallet
+            );
+            console.log(_token)
+            setStarlightToken(_token)
         }
-        // console.log(Web3)
-        // const _web3 = await getWeb3();
-        // if (_web3) {
-        //     const _CLoria = new _web3.eth.Contract(CryptoLoria, TOKEN);
-        //     const _CLoriaSig = new _web3.eth.Contract(CryptoLoriaSig, SigAddress);
-        //     setWEB3(_web3);
-        //     setMsdoge(_CLoria);
-        //     setMsdogeSig(_CLoriaSig);
-        // setTokenAddress(TOKEN);
-        //     const _owner = await _web3.eth.getAccounts();
-        //     if (_owner.length) {
-        //         if (OWNERS.indexOf(_owner[0]) > -1) {
-        //             setIsConnected(true);
-        //             setOwnerAddress(_owner[0]);
-        //         }
-        //     }
-        // }
+
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isConnected])
 
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     useEffect(async () => {
-        if (connection && isConnected && ownerAddress != 'Loading...') {
+        if (starlightToken && multisigProgram && isConnected && ownerAddress != 'Loading...') {
             console.log('changed');
+            await getRequestedList();
             await initalSetting();
-            // await getRequestedList();
             // await getAirDropList();
             // await getLatestItem();
         }
 
-    }, [isConnected, ownerAddress, connection])
+    }, [starlightToken, multisigProgram])
 
-    // useEffect(async() => {
-    //     if (isMultipleTransfering) {
-    //         await approveTransferRequest(0)
-    //     }
-    // },[isMultipleTransfering]);
+  
+    const getSentAmount = async () => {
+        console.log(await multisigProgram.account.requestStruct.all())
+        let _transferAmount = 0;
+        for (const _item of transferedList) {
+            _transferAmount += _item.account.value.toNumber()
 
-    // useEffect(async() => {
-    //     if (isMultipleDeclining) {
-    //         await declineTransferRequest(0)
-    //     }
-    // },[isMultipleDeclining]);
+        }
+        return _transferAmount;
+    }
 
     const initalSetting = async () => {
         // const _ownerBalance = await 
         console.log(connection)
-        const _totalSupply = await connection.getTokenSupply(TOKEN_PROGRAM_ID);
+        const _totalSupply = await connection.getTokenSupply(TOKEN_MINT_ADDRESS);
         console.log(_totalSupply)
         setTotalSupply(_totalSupply?.value?.amount * 1 / (Math.pow(10, 9)))
-        const _ownerBalance = await connection.getTokenAccountBalance(TOKEN_ACCOUNT_ID);
+        console.log(starlightToken)
+        const fromTokenAccount = await starlightToken.getOrCreateAssociatedAccountInfo(ownerAddress);
+        const _ownerBalance = await connection.getTokenAccountBalance(fromTokenAccount.address);
         console.log(_ownerBalance)
         setOwnerBalance(_ownerBalance?.value?.amount * 1 / (Math.pow(10, 9)))
-        setSentAmount(_totalSupply?.value?.amount * 1 / (Math.pow(10, 9)) - _ownerBalance?.value?.amount * 1 / (Math.pow(10, 9)))
-        // const _ownerBalance = await cloria.methods.balanceOf(ownerAddress).call();
-        // setOwnerBalance(_ownerBalance / (Math.pow(10, 9)));
-        // const _totalSupply = await cloria.methods.totalSupply().call();
-        // setTotalSupply(_totalSupply / (2 * Math.pow(10, 9)));
-        // const _sentAmount = await cloriaSig.methods.getTransferedAmount().call({ from: ownerAddress });
-        // setSentAmount(_sentAmount / (Math.pow(10, 9)));
+        const _sentAmount = await getSentAmount();
+        setSentAmount(_sentAmount)
     }
     const createTransferRequest = async () => {
-            if (!isConnected) {
-                NotificationManager.warning("Phantom is not connected!", "Warning");
-                return;
-            }
+        if (!isConnected) {
+            NotificationManager.warning("Phantom is not connected!", "Warning");
+            return;
+        }
 
-            if (!transferAddress) {
-                NotificationManager.warning("Please enter correct address!", "Warning");
-                return;
-            }
+        if (!transferAddress) {
+            NotificationManager.warning("Please enter correct address!", "Warning");
+            return;
+        }
 
-            if (transferAmount <= 0) {
-                NotificationManager.warning("Please enter correct amount!", "Warning");
-                return;
-            }
+        if (transferAmount <= 0) {
+            NotificationManager.warning("Please enter correct amount!", "Warning");
+            return;
+        }
 
-            setIsLoading(true);
-            try{
+        setIsLoading(true);
+        try {
+            // const token = new splToken.Token(connection, TOKEN_ACCOUNT_ID, TOKEN_PROGRAM_ID, signer1Keypair);
+            const _transferAccount = web3.Keypair.generate();
 
-                var myToken = new splToken.Token(
-                    connection,
-                    TOKEN_PROGRAM_ID,
-                    splToken.TOKEN_PROGRAM_ID,
-                    signer1Keypair
-                );
-                // const token = new splToken.Token(connection, TOKEN_ACCOUNT_ID, TOKEN_PROGRAM_ID, signer1Keypair);
-                const fromTokenAccount = await myToken.getOrCreateAssociatedAccountInfo(
-                    new web3.PublicKey('Dgsw86s5mP7uzWoH7F7LusmE7K5VzP4Qq3tLMY5j9Gma')
-                  )
-                const toTokenAccount = await myToken.getOrCreateAssociatedAccountInfo(
-                    new web3.PublicKey(transferAddress)
-                )
-                console.log( fromTokenAccount.address.toString() , new web3.PublicKey(transferAddress).toString(), new web3.PublicKey('Dgsw86s5mP7uzWoH7F7LusmE7K5VzP4Qq3tLMY5j9Gma').toString(), [signer1Keypair, signer2Keypair], transferAmount*1)
-                let airdropSignature = await connection.requestAirdrop(
-                    new web3.PublicKey('Dgsw86s5mP7uzWoH7F7LusmE7K5VzP4Qq3tLMY5j9Gma'),
-                    web3.LAMPORTS_PER_SOL,
-                );
-                console.log(await myToken.getMultisigInfo(new web3.PublicKey('y8NeQJQfK9B6gougLNgP775HK6DDhbgFUKS8pe91X8b')))
-                await connection.confirmTransaction(airdropSignature);
-                let transaction = new web3.Transaction();
-                transaction.add(web3.SystemProgram.transfer({
-                    fromPubkey: fromTokenAccount.publicKey,
-                    toPubkey: toTokenAccount.publicKey,
-                    lamports: 1000,
-                }));
-                await web3.sendAndConfirmTransaction(connection, transaction,  [signer1Keypair, signer2Keypair])
-                // const approve = await myToken.approve( fromTokenAccount.address , new web3.PublicKey(transferAddress), new web3.PublicKey('Dgsw86s5mP7uzWoH7F7LusmE7K5VzP4Qq3tLMY5j9Gma'), [signer1Keypair, signer2Keypair], transferAmount*1 );
-          
-                // await cloria.methods.approve(SigAddress, web3.utils.toWei(transferAmount.toString(), "mwei")).
-                // send({ from : ownerAddress })
-                // .on('receipt', async(receipt) => {
-                //     await cloriaSig.methods.newTransferRequest(transferAddress, web3.utils.toWei(transferAmount.toString(), "mwei"))
-                //     .send({ from: ownerAddress })
-                //     .on('receipt', async(res) => {
-                //         NotificationManager.info("Added successfully!", "Info");
-                //         const len = await cloriaSig.methods.getRequestLength().call();
-                //         const item = await cloriaSig.methods.getTransferItem(len - 1).call();
-                //         setActiveIdx(item.index - 1);
-                //         await getRequestedList();
-                //         setIsLoading(false);
-                //         setTransferAddress('');
-                //         setTransferAmount('');
-                //     });
-                // })
+            const provider = await getProvider()
+            const fromTokenAccount = await starlightToken.getOrCreateAssociatedAccountInfo(
+                ownerAddress
+            )
+            const toTokenAccount = await starlightToken.getOrCreateAssociatedAccountInfo(
+                new web3.PublicKey(transferAddress)
+            )
+            // console.log( fromTokenAccount.address.toString() , new web3.PublicKey(transferAddress).toString(), fromWallet.publicKey.toString(), [signer1Keypair, signer2Keypair], transferAmount*1)
+            let airdropSignature = await connection.requestAirdrop(
+                ownerAddress,
+                web3.LAMPORTS_PER_SOL,
+            );
+            await connection.confirmTransaction(airdropSignature);
+
+            await starlightToken.approve(
+                fromTokenAccount.address,
+                new web3.PublicKey(transferAddress),
+                ownerAddress,
+                [signer1Keypair, signer2Keypair],
+                transferAmount * 1
+            );
+
+            setEndTransferRequestIdx(_transferAccount.publicKey);
+            const _value = new anchor.BN(transferAmount * 1);
+            await multisigProgram.rpc.createTransferRequest(ownerAddress, new web3.PublicKey(transferAddress), _value, {
+                accounts: {
+                    transferAccount: _transferAccount.publicKey,
+                    user: provider.wallet.publicKey,
+                    systemProgram: web3.SystemProgram.programId,
+                },
+                signers: [_transferAccount]
+            });
+            const transferList = await multisigProgram.account.requestStruct.all();
+            setEndTransferRequest(transferList[transferList.length - 1].account);
+            setEndTransferRequestIdx(transferList[transferList.length - 1].publicKey)
+
+            setTransferAddress('');
+            setTransferAmount('');
+            await getRequestedList();
+
+            console.log("SUCCESS");
+            setIsLoading(false)
+            NotificationManager.info("Added successfully!", "Info");
+
+        }
+        catch (err) {
+            console.log(err)
+            if (err) {
+                setIsLoading(false);
+                NotificationManager.error("Request is failed!", "Failed");
+                setTransferAddress('');
+                setTransferAmount('');
             }
-            catch(err) {
-                console.log(err)
-                if (err) {
-                    setIsLoading(false);
-                    NotificationManager.error("Request is failed!", "Failed");
-                    setTransferAddress('');
-                    setTransferAmount('');
-                }
-            }
+        }
     }
 
     const approveTransferRequest = async () => {
-        //     if (!isConnected) {
-        //         NotificationManager.warning("Metamask is not connected!", "Warning");
-        //         return;
-        //     }
+        if (!isConnected) {
+            NotificationManager.warning("Metamask is not connected!", "Warning");
+            return;
+        }
 
-        //     if (!endTransferRequest) {
-        //         NotificationManager.warning("No request!", "Warning");
-        //         return;
-        //     }
+        if (!endTransferRequest) {
+            NotificationManager.warning("No request!", "Warning");
+            return;
+        }
 
-        //     try {
-        //         setIsLoading(true);
-        //         await cloriaSig.methods.approveTransferRequest(endTransferRequest.index)
-        //         .send({ from: ownerAddress })
-        //         .on('receipt', async(res) => {
-        //             NotificationManager.success("Sent successfully!", "Success");
-        //             await getRequestedList();
-        //             await getLatestItem();
-        //             setIsLoading(false);
-        //         })
-        //         .catch(err => {
-        //             console.log(err);
-        //         })
+        try {
+            setIsLoading(true);
+            const provider = await getProvider()
 
-        //     } catch(err) {
-        //         NotificationManager.error("Transaction is failed!", "Failed");
-        //         await getRequestedList();
-        //         await getLatestItem();
-        //         setIsLoading(false);
-        //     }
+            const fromTokenAccount = await starlightToken.getOrCreateAssociatedAccountInfo(
+                endTransferRequest.createdBy
+            )
+            const toTokenAccount = await starlightToken.getOrCreateAssociatedAccountInfo(
+                endTransferRequest.to
+            )
+
+            let airdropSignature = await connection.requestAirdrop(
+                fromTokenAccount.owner,
+                web3.LAMPORTS_PER_SOL,
+            );
+            await connection.confirmTransaction(airdropSignature);
+
+            await multisigProgram.rpc.sendTransferRequest(provider.wallet.publicKey, {
+                accounts: {
+                    transferAccount: endTransferRequestIdx,
+                },
+            });
+
+            let transaction = new web3.Transaction();
+            transaction.add(
+                splToken.Token.createTransferInstruction(
+                    splToken.TOKEN_PROGRAM_ID,
+                    fromTokenAccount.address,
+                    toTokenAccount.address,
+                    fromTokenAccount.owner,
+                    [],
+                    web3.LAMPORTS_PER_SOL * endTransferRequest.value.toNumber()
+                )
+            );
+            const signature = await web3.sendAndConfirmTransaction(
+                connection,
+                transaction,
+                [fromWallet]
+            );
+            console.log(endTransferRequestIdx.toString())
+
+
+            NotificationManager.success("Sent successfully!", "Success");
+            setIsLoading(false);
+            setEndTransferRequest(null);
+            await getRequestedList();
+            await initalSetting()
+            console.log(signature)
+        } catch (err) {
+            console.log(err)
+            NotificationManager.error("Transaction is failed!", "Failed");
+            await getRequestedList();
+            // await getLatestItem();
+            setIsLoading(false);
+        }
     }
 
-    const declineTransferRequest = async (idx) => {
-        //     if (!isConnected) {
-        //         NotificationManager.warning("Metamask is not connected!", "Warning");
-        //         return;
-        //     }
+    const declineTransferRequest = async () => {
+        if (!isConnected) {
+            NotificationManager.warning("Phantom is not connected!", "Warning");
+            return;
+        }
 
-        //     if (!endTransferRequest) {
-        //         NotificationManager.warning("No request!", "Warning");
-        //         return;
-        //     }
+        if (!endTransferRequest && !endTransferRequestIdx) {
+            NotificationManager.warning("No request!", "Warning");
+            return;
+        }
 
-        //     try {
-        //         setIsLoading(true);
-        //         await cloriaSig.methods.declineTransferRequest(endTransferRequest.index)
-        //         .send({ from: ownerAddress })
-        //         .on('receipt', async(res) => {
-        //             NotificationManager.success("Sent successfully!", "Success");
-        //             await getRequestedList();
-        //             await getLatestItem();
-        //             setIsLoading(false);
-        //         })
-        //         .catch(err => {
-        //             console.log(err);
-        //         })
+        try {
+            setIsLoading(true);
+            const provider = await getProvider()
 
-        //     } catch(err) {
-        //         NotificationManager.error("Transaction is failed!", "Failed");
-        //         await getRequestedList();
-        //         await getLatestItem();
-        //         setIsLoading(false);
+            let airdropSignature = await connection.requestAirdrop(
+                provider.wallet.publicKey,
+                web3.LAMPORTS_PER_SOL,
+            );
+            await connection.confirmTransaction(airdropSignature);
 
-        //     }
+            await multisigProgram.rpc.declineTransferRequest(provider.wallet.publicKey, {
+                accounts: {
+                    transferAccount: endTransferRequestIdx,
+                },
+            });
+            await getRequestedList();
+            NotificationManager.success("Sent successfully!", "Success");
+            // await getLatestItem();
+            setIsLoading(false);
+
+        } catch (err) {
+            NotificationManager.error("Transaction is failed!", "Failed");
+            await getRequestedList();
+            // await getLatestItem();
+            setIsLoading(false);
+        }
     }
 
-    // const getRequestedList = async () => {
-    //     if (!isConnected) {
-    //         NotificationManager.warning("Metamask is not connected!", "Warning");
-    //         return;
-    //     }
-
-    //     if (!cloriaSig) {web3cloriaSig.methods.getRequestList().call({ from: ownerAddress });
-    //     const requestList = list.filter(item => item.isClosed == false && item.isSent == false);
-    //     const sentList = list.filter(item => item.isSent == true);
-    //     console.log('list=>', list);
-    //     setRequestedList(requestList);
-    //     setTransferedList(sentList);
-    // }
+    const getRequestedList = async () => {
+        if (!isConnected) {
+            NotificationManager.warning("Phantom is not connected!", "Warning");
+            return;
+        }
+        const _list = await multisigProgram.account.requestStruct.all()
+        const requestList = _list.filter(item => item.account.isClosed === false && item.account.isSent === false);
+        const sentList = _list.filter(item => item.account.isSent === true);
+        console.log('list=>', _list);
+        console.log('requestList=>', requestList)
+        console.log('sentList=>', sentList)
+        if (requestList.length) {
+            setEndTransferRequest(requestList[requestList.length - 1].account)
+            setEndTransferRequestIdx(requestList[requestList.length - 1].publicKey)
+        } else {
+            setEndTransferRequest(null)
+            setEndTransferRequestIdx(null)
+        }
+        setRequestedList(requestList);
+        setTransferedList(sentList);
+    }
 
     // const getAirDropList = async() => {
     //     if (!isConnected) {
@@ -555,7 +629,7 @@ const Lawis = () => {
             const walletConnection = await p.connect();
             setWeb3Provider(p);
             const addr = walletConnection.publicKey.toString();
-            if(addr) {
+            if (addr) {
                 setIsConnected(true)
                 setOwnerAddress(addr);
             }
@@ -597,15 +671,9 @@ const Lawis = () => {
     return (
         <>
             <NotificationContainer />
-            { isLoading && <Loading />}
-            <div className="container d-flex justify-content-end mt-3">
-                <button type="button" className="btn btn-success mb-1" id="wallet-connect" onClick={walletConnect}>
-                    {
-                        isConnected
-                            ? ownerAddress.substr(0, 6) + '...' + ownerAddress.substr(-4)
-                            : "Connect Wallet"
-                    }
-                </button>
+            {isLoading && <Loading />}
+            <div className="container d-flex justify-content-end pt-3">
+                <WalletMultiButton />
             </div>
             <div className="container d-flex justify-content-center">
                 <div className="col image-wrapper logo">
@@ -639,7 +707,7 @@ const Lawis = () => {
                                     Owner address
                                 </h5>
                                 <div className="card-text" id="ownerAddress">
-                                    {ownerAddress}
+                                    {ownerAddress.toString()}
                                 </div>
 
                             </div>
@@ -774,7 +842,7 @@ const Lawis = () => {
                                             type="text"
                                             className="form-control"
                                             id="createTransferToAddress"
-                                            value={endTransferRequest ? endTransferRequest.to : ''}
+                                            value={endTransferRequest ? endTransferRequest.to.toString() : ''}
                                             readOnly
                                         />
                                     </div>
@@ -784,7 +852,7 @@ const Lawis = () => {
                                             type="number"
                                             className="form-control"
                                             id="createTransferTokens"
-                                            value={endTransferRequest ? web3.utils.fromWei(endTransferRequest.value, 'mwei') : ''}
+                                            value={endTransferRequest ? endTransferRequest.value.toNumber() : ''}
                                             readOnly
                                         />
                                     </div>
@@ -794,11 +862,11 @@ const Lawis = () => {
                                             type="text"
                                             className="form-control"
                                             id="createTransferTokens"
-                                            value={endTransferRequest ? endTransferRequest.createdBy : ''}
+                                            value={endTransferRequest ? endTransferRequest.createdBy.toString() : ''}
                                             readOnly
                                         />
                                     </div>
-                                    <label htmlFor="createTransferTokens">Number of Cancellations</label>
+                                    {/* <label htmlFor="createTransferTokens">Number of Cancellations</label>
                                     <div className="input-group mb-3">
                                         <input
                                             type="number"
@@ -807,7 +875,7 @@ const Lawis = () => {
                                             value={endTransferRequest ? decTransferNumber : ''}
                                             readOnly
                                         />
-                                    </div>
+                                    </div> */}
                                 </fieldset>
 
                             </div>
@@ -929,8 +997,8 @@ const Lawis = () => {
                                     return (
                                         <tr key={idx}>
                                             <td>{idx + 1}</td>
-                                            <td>{item.to}</td>
-                                            <td>{web3.utils.fromWei(item.value, 'mwei')}</td>
+                                            <td>{item.account.to.toString()}</td>
+                                            <td>{item.account.value.toNumber()}</td>
                                         </tr>
                                     )
                                 })
@@ -1027,10 +1095,10 @@ const Lawis = () => {
                                     return (
                                         <tr key={idx}>
                                             <td>{idx + 1}</td>
-                                            <td>{item.createdBy}</td>
-                                            <td>{item.to}</td>
-                                            <td>{item.dealedBy}</td>
-                                            <td>{web3.utils.fromWei(item.value, "mwei")}</td>
+                                            <td>{item.account.createdBy.toString().substr(0, 6) + ' . . . ' + item.account.createdBy.toString().substr(-5)}</td>
+                                            <td>{item.account.to.toString().substr(0, 6) + ' . . . ' + item.account.to.toString().substr(-5)}</td>
+                                            <td>{item.account.dealedBy.toString().substr(0, 6) + ' . . . ' + item.account.dealedBy.toString().substr(-5)}</td>
+                                            <td>{item.account.value.toNumber()}</td>
                                         </tr>
                                     )
                                 })
@@ -1065,7 +1133,7 @@ const Lawis = () => {
                                     return (
                                         <tr key={idx}>
                                             <td>{idx + 1}</td>
-                                            <td>{ownerAddress}</td>
+                                            <td>{ownerAddress.toString()}</td>
                                             <td>{item.addresses}</td>
                                             <td>{web3.utils.fromWei(item.balances, "mwei")}</td>
                                         </tr>
