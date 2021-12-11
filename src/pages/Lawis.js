@@ -138,7 +138,7 @@ const Lawis = () => {
 
     }, [starlightToken, multisigProgram])
 
-  
+
     const getSentAmount = async () => {
         console.log(await multisigProgram.account.requestStruct.all())
         let _transferAmount = 0;
@@ -181,17 +181,12 @@ const Lawis = () => {
 
         setIsLoading(true);
         try {
-            // const token = new splToken.Token(connection, TOKEN_ACCOUNT_ID, TOKEN_PROGRAM_ID, signer1Keypair);
             const _transferAccount = web3.Keypair.generate();
 
             const provider = await getProvider()
             const fromTokenAccount = await starlightToken.getOrCreateAssociatedAccountInfo(
                 ownerAddress
             )
-            const toTokenAccount = await starlightToken.getOrCreateAssociatedAccountInfo(
-                new web3.PublicKey(transferAddress)
-            )
-            // console.log( fromTokenAccount.address.toString() , new web3.PublicKey(transferAddress).toString(), fromWallet.publicKey.toString(), [signer1Keypair, signer2Keypair], transferAmount*1)
             let airdropSignature = await connection.requestAirdrop(
                 ownerAddress,
                 web3.LAMPORTS_PER_SOL,
@@ -444,47 +439,47 @@ const Lawis = () => {
     }
 
     const importAirDropList = (e) => {
-        //     if (!isConnected) {
-        //         NotificationManager.warning("Metamask is not connected!", "Warning");
-        //         return;
-        //     }
+        if (!isConnected) {
+            NotificationManager.warning("Phantom is not connected!", "Warning");
+            return;
+        }
 
-        //     const file = e.target.files[0];
-        //     const reader = new FileReader();
-        //     reader.onloadend = function(e) {
-        //         const text = e.target.result;
-        //         processCSV(text)
-        //     }
+        const file = e.target.files[0];
+        const reader = new FileReader();
+        reader.onloadend = function (e) {
+            const text = e.target.result;
+            processCSV(text)
+        }
 
-        //     reader.readAsText(file);
+        reader.readAsText(file);
     }
 
-    // const processCSV = (str, delim = ',') => {
-    //     const headers = str.slice(0,str.indexOf('\n') - 1 ).split(delim);
-    //     const rows = str.slice(str.indexOf('\n') + 1, str.length - 1).split('\n');
-    //     const newArray = rows.map(row => {
-    //         row = row.slice(0, row.indexOf('\r'));
-    //         const values = row.split(delim);
-    //         const eachObject = headers.reduce((obj, header, i) => {
-    //             obj[header] = values[i];
-    //             return obj;
-    //         }, {})
-    //         return eachObject;
-    //     })
-    //     const dropList = newArray.slice(0, 1);
-    //     setAirDropList(dropList)
-    // }
+    const processCSV = (str, delim = ',') => {
+        const headers = str.slice(0, str.indexOf('\n') - 1).split(delim);
+        const rows = str.slice(str.indexOf('\n') + 1, str.length - 1).split('\n');
+        const newArray = rows.map(row => {
+            row = row.slice(0, row.indexOf('\r'));
+            const values = row.split(delim);
+            const eachObject = headers.reduce((obj, header, i) => {
+                obj[header] = values[i];
+                return obj;
+            }, {})
+            return eachObject;
+        })
+        const dropList = newArray.slice(0, 1);
+        setAirDropList(dropList)
+    }
 
     const createBurnRequest = async () => {
-        //     if (!isConnected) {
-        //         NotificationManager.warning("Metamask is not connected!", "Warning");
-        //         return;
-        //     }
+        if (!isConnected) {
+            NotificationManager.warning("Phantom is not connected!", "Warning");
+            return;
+        }
 
-        //     if (!burnAmount) {
-        //         NotificationManager.warning("Please input amount", "Warning");
-        //         return;
-        //     }
+        if (!burnAmount) {
+            NotificationManager.warning("Please input amount", "Warning");
+            return;
+        }
 
         //     const requestItem = await cloriaSig.methods.getBurnRequest().call();
         //     if (requestItem.isActive) {
@@ -492,29 +487,45 @@ const Lawis = () => {
         //         return;
         //     }
 
-        //     setBurnAmount('');
-        //     setIsLoading(true);
+        setBurnAmount('');
+        setIsLoading(true);
 
-        //     try {
-        //         await cloria.methods.approve(SigAddress, web3.utils.toWei(burnAmount.toString(), "mwei")).
-        //         send({ from : ownerAddress })
-        //         .on('receipt', async(receipt) => {
-        //             await cloriaSig.methods.newBurnRequest(web3.utils.toWei(burnAmount.toString(),"mwei"))
-        //             .send({ from: ownerAddress })
-        //             .on('receipt', (res) => {
-        //                 NotificationManager.success("Requested successfully", "Success");
-        //                 setReqeustBurn(false);
-        //                 setIsLoading(false);
-        //             });
-        //         })
-        //     } catch(err) {
-        //         console.log(err);
-        //         if (err) {
-        //             setReqeustBurn(false);
-        //             NotificationManager.error("Request failed", "Failed");
-        //             setIsLoading(false);
-        //         }
-        //     }
+        try {
+            //         await cloria.methods.approve(SigAddress, web3.utils.toWei(burnAmount.toString(), "mwei")).
+            //         send({ from : ownerAddress })
+            //         .on('receipt', async(receipt) => {
+            //             await cloriaSig.methods.newBurnRequest(web3.utils.toWei(burnAmount.toString(),"mwei"))
+            //             .send({ from: ownerAddress })
+            //             .on('receipt', (res) => {
+            //             });
+            //         })
+            const provider = await getProvider()
+            const fromTokenAccount = await starlightToken.getOrCreateAssociatedAccountInfo(
+                ownerAddress
+            )
+            let airdropSignature = await connection.requestAirdrop(
+                ownerAddress,
+                web3.LAMPORTS_PER_SOL,
+            );
+            await connection.confirmTransaction(airdropSignature);
+
+            await starlightToken.burn(
+                fromTokenAccount.address,
+                ownerAddress,
+                [signer1Keypair, signer2Keypair],
+                web3.LAMPORTS_PER_SOL * burnAmount * 1
+            );
+            NotificationManager.success("Requested successfully", "Success");
+            // setReqeustBurn(false);
+            setIsLoading(false);
+        } catch (err) {
+            console.log(err);
+            if (err) {
+                // setReqeustBurn(false);
+                NotificationManager.error("Request failed", "Failed");
+                setIsLoading(false);
+            }
+        }
 
     }
 
