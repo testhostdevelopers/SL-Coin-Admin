@@ -11,6 +11,8 @@ import config from "./config.json";
 import signer1 from "../contracts/signer-1.json";
 import signer2 from "../contracts/signer-2.json";
 import signer3 from "../contracts/signer-3.json";
+import transfer_json from "../contracts/transferAccount.json";
+import airdrop_json from "../contracts/airdropAccount.json";
 // import Wallet from '@solana/wallet-adapter-wallets';
 // import * as Web3 from '@solana/web3.js';
 import {
@@ -77,6 +79,10 @@ const Lawis = () => {
     const signer2Keypair = web3.Keypair.fromSecretKey(signer2SecretKey);
     const signer3SecretKey = new Uint8Array(signer3);
     const signer3Keypair = web3.Keypair.fromSecretKey(signer3SecretKey);
+    const transferSecretKey = new Uint8Array(transfer_json);
+    const transferKeypair = web3.Keypair.fromSecretKey(transferSecretKey);
+    const airdropSecretKey = new Uint8Array(airdrop_json);
+    const airdropKeypair = web3.Keypair.fromSecretKey(airdropSecretKey);
     const wallet = useWallet();
 
     const getProvider = async () => {
@@ -112,6 +118,7 @@ const Lawis = () => {
             const provider = await getProvider()
             /* create the program interface combining the idl, program ID, and provider */
             const _program = new Program(multiSigIdl, multisigProgramID, provider);
+            console.log(_program)
             setMultisigProgram(_program);
             const _token = new splToken.Token(
                 connection,
@@ -140,10 +147,9 @@ const Lawis = () => {
 
 
     const getSentAmount = async () => {
-        console.log(await multisigProgram.account.requestStruct.all())
         let _transferAmount = 0;
         for (const _item of transferedList) {
-            _transferAmount += _item.account.value.toNumber()
+            _transferAmount += _item.value.toNumber()
 
         }
         return _transferAmount;
@@ -162,6 +168,7 @@ const Lawis = () => {
         setOwnerBalance(_ownerBalance?.value?.amount * 1 / (Math.pow(10, 9)))
         const _sentAmount = await getSentAmount();
         setSentAmount(_sentAmount)
+        await getLatestItem();
     }
     const createTransferRequest = async () => {
         if (!isConnected) {
@@ -181,17 +188,16 @@ const Lawis = () => {
 
         setIsLoading(true);
         try {
-            const _transferAccount = web3.Keypair.generate();
-
+            const _transferAccount = transferKeypair;
             const provider = await getProvider()
             const fromTokenAccount = await starlightToken.getOrCreateAssociatedAccountInfo(
                 ownerAddress
             )
-            let airdropSignature = await connection.requestAirdrop(
-                ownerAddress,
-                web3.LAMPORTS_PER_SOL,
-            );
-            await connection.confirmTransaction(airdropSignature);
+            // let airdropSignature = await connection.requestAirdrop(
+            //     ownerAddress,
+            //     web3.LAMPORTS_PER_SOL,
+            // );
+            // await connection.confirmTransaction(airdropSignature);
 
             await starlightToken.approve(
                 fromTokenAccount.address,
@@ -200,25 +206,35 @@ const Lawis = () => {
                 [signer1Keypair, signer2Keypair],
                 transferAmount * 1
             );
-
-            setEndTransferRequestIdx(_transferAccount.publicKey);
             const _value = new anchor.BN(transferAmount * 1);
-            await multisigProgram.rpc.createTransferRequest(ownerAddress, new web3.PublicKey(transferAddress), _value, {
-                accounts: {
-                    transferAccount: _transferAccount.publicKey,
-                    user: provider.wallet.publicKey,
-                    systemProgram: web3.SystemProgram.programId,
-                },
-                signers: [_transferAccount]
-            });
-            const transferList = await multisigProgram.account.requestStruct.all();
-            setEndTransferRequest(transferList[transferList.length - 1].account);
-            setEndTransferRequestIdx(transferList[transferList.length - 1].publicKey)
+            console.log(_transferAccount.publicKey.toString(),  await multisigProgram.account.requestStructList.all())
+            let _transfer_list = await multisigProgram.account.requestStructList.all();
+            
+            console.log(_transfer_list[_transfer_list.length-1].publicKey.toString())
+            
+            if (_transfer_list.length == 0) {
+                console.log(1)
+                await multisigProgram.rpc.createTransferRequest(ownerAddress, new web3.PublicKey(transferAddress), _value, {
+                    accounts: {
+                        transferAccount: _transferAccount.publicKey,
+                        user: provider.wallet.publicKey,
+                        systemProgram: web3.SystemProgram.programId,
+                    },
+                    signers: [_transferAccount]
+                });
+            } else {
+                console.log(2)
+                await multisigProgram.rpc.addTransferRequest(ownerAddress, new web3.PublicKey(transferAddress), _value, {
+                    accounts: {
+                        transferAccount: transferKeypair.publicKey,
+                    },
+                });
+            }
 
             setTransferAddress('');
             setTransferAmount('');
             await getRequestedList();
-
+            await getLatestItem();
             console.log("SUCCESS");
             setIsLoading(false)
             NotificationManager.info("Added successfully!", "Info");
@@ -237,7 +253,7 @@ const Lawis = () => {
 
     const approveTransferRequest = async () => {
         if (!isConnected) {
-            NotificationManager.warning("Metamask is not connected!", "Warning");
+            NotificationManager.warning("Phantom is not connected!", "Warning");
             return;
         }
 
@@ -257,15 +273,15 @@ const Lawis = () => {
                 endTransferRequest.to
             )
 
-            let airdropSignature = await connection.requestAirdrop(
-                fromTokenAccount.owner,
-                web3.LAMPORTS_PER_SOL,
-            );
-            await connection.confirmTransaction(airdropSignature);
+            // let airdropSignature = await connection.requestAirdrop(
+            //     fromTokenAccount.owner,
+            //     web3.LAMPORTS_PER_SOL,
+            // );
+            // await connection.confirmTransaction(airdropSignature);
 
-            await multisigProgram.rpc.sendTransferRequest(provider.wallet.publicKey, {
+            await multisigProgram.rpc.sendTransferRequest(provider.wallet.publicKey, new anchor.BN(endTransferRequestIdx), {
                 accounts: {
-                    transferAccount: endTransferRequestIdx,
+                    transferAccount: transferKeypair.publicKey,
                 },
             });
 
@@ -285,20 +301,20 @@ const Lawis = () => {
                 transaction,
                 [fromWallet]
             );
-            console.log(endTransferRequestIdx.toString())
-
 
             NotificationManager.success("Sent successfully!", "Success");
             setIsLoading(false);
             setEndTransferRequest(null);
             await getRequestedList();
-            await initalSetting()
-            console.log(signature)
+            await getLatestItem();
+            await initalSetting();
+            console.log(signature);
+
         } catch (err) {
             console.log(err)
             NotificationManager.error("Transaction is failed!", "Failed");
             await getRequestedList();
-            // await getLatestItem();
+            await getLatestItem();
             setIsLoading(false);
         }
     }
@@ -318,20 +334,20 @@ const Lawis = () => {
             setIsLoading(true);
             const provider = await getProvider()
 
-            let airdropSignature = await connection.requestAirdrop(
-                provider.wallet.publicKey,
-                web3.LAMPORTS_PER_SOL,
-            );
-            await connection.confirmTransaction(airdropSignature);
+            // let airdropSignature = await connection.requestAirdrop(
+            //     provider.wallet.publicKey,
+            //     web3.LAMPORTS_PER_SOL,
+            // );
+            // await connection.confirmTransaction(airdropSignature);
 
-            await multisigProgram.rpc.declineTransferRequest(provider.wallet.publicKey, {
+            await multisigProgram.rpc.declineTransferRequest(provider.wallet.publicKey, new anchor.BN(endTransferRequestIdx), {
                 accounts: {
-                    transferAccount: endTransferRequestIdx,
+                    transferAccount: transferKeypair.publicKey,
                 },
             });
             await getRequestedList();
             NotificationManager.success("Sent successfully!", "Success");
-            // await getLatestItem();
+            await getLatestItem();
             setIsLoading(false);
 
         } catch (err) {
@@ -347,9 +363,9 @@ const Lawis = () => {
             NotificationManager.warning("Phantom is not connected!", "Warning");
             return;
         }
-        const _list = await multisigProgram.account.requestStruct.all()
-        const requestList = _list.filter(item => item.account.isClosed === false && item.account.isSent === false);
-        const sentList = _list.filter(item => item.account.isSent === true);
+        const _list = await multisigProgram.account.requestStructList.fetch(transferKeypair.publicKey)
+        const requestList = _list.list.filter(item => item.isClosed === false && item.isSent === false);
+        const sentList = _list.list.filter(item => item.isSent === true);
         console.log('list=>', _list);
         console.log('requestList=>', requestList)
         console.log('sentList=>', sentList)
@@ -366,7 +382,7 @@ const Lawis = () => {
 
     // const getAirDropList = async() => {
     //     if (!isConnected) {
-    //         NotificationManager.warning("Metamask is not connected!", "Warning");
+    //         NotificationManager.warning("Phantom is not connected!", "Warning");
     //         return;
     //     }
 
@@ -379,63 +395,100 @@ const Lawis = () => {
     // }
 
     const approveRequestList = async () => {
-        // if (!isConnected) {
-        //         NotificationManager.warning("Metamask is not connected!", "Warning");
-        //         return;
-        //     }
+        if (!isConnected) {
+            NotificationManager.warning("Phantom is not connected!", "Warning");
+            return;
+        }
 
-        //     let sendMultiple = [];
+        let sendMultiple = [];
+        if (!requestedList.length) {
+            NotificationManager.warning("No requests!", "Warning");
+            return;
+        }
+        try {
+            setIsLoading(true);
+            const provider = await getProvider()
+            let transaction = new web3.Transaction();
+            for (let i = 0; i < requestedList.length; i++) {
+                const fromTokenAccount = await starlightToken.getOrCreateAssociatedAccountInfo(
+                    requestedList[i].createdBy
+                )
+                const toTokenAccount = await starlightToken.getOrCreateAssociatedAccountInfo(
+                    requestedList[i].to
+                )
+                transaction.add(
+                    splToken.Token.createTransferInstruction(
+                        splToken.TOKEN_PROGRAM_ID,
+                        fromTokenAccount.address,
+                        toTokenAccount.address,
+                        fromTokenAccount.owner,
+                        [],
+                        web3.LAMPORTS_PER_SOL * requestedList[i].value.toNumber()
+                    )
+                );
+                sendMultiple[i] = requestedList[i].index;
+            }
+            await multisigProgram.rpc.sendTransferListRequest(provider.wallet.publicKey, sendMultiple, {
+                accounts: {
+                    transferAccount: transferKeypair.publicKey,
+                },
+            })
 
-        //     for (let i = 0; i < requestedList.length; i ++) {
-        //         sendMultiple[i] = requestedList[i]['index'];
-        //     }
+            const signature = await web3.sendAndConfirmTransaction(
+                connection,
+                transaction,
+                [fromWallet]
+            );
 
-        //     try {
-        //         setIsLoading(true);
-        //         await cloriaSig.methods.approveTransferListRequest(sendMultiple)
-        //         .send({ from: ownerAddress })
-        //         .on('receipt', async(res) => {
-        //             NotificationManager.success("Sent successfully!", "Success");
-        //             await getRequestedList();
-        //             await getLatestItem();
-        //             setIsLoading(false);
-        //         })
-        //     } catch(err) {
-        //         NotificationManager.error("Transaction is failed!", "Failed");
-        //         await getRequestedList();
-        //         await getLatestItem();
-        //         setIsLoading(false);
-        //     }
+            NotificationManager.success("Sent successfully!", "Success");
+            await getRequestedList();
+            await getLatestItem();
+            setIsLoading(false);
+            console.log(signature)
+
+        } catch (err) {
+            NotificationManager.error("Transaction is failed!", "Failed");
+            await getRequestedList();
+            await getLatestItem();
+            setIsLoading(false);
+        }
     }
 
     const declineRequestList = async () => {
-        //     if (!isConnected) {
-        //         NotificationManager.warning("Metamask is not connected!", "Warning");
-        //         return;
-        //     }
+        if (!isConnected) {
+            NotificationManager.warning("Phantom is not connected!", "Warning");
+            return;
+        }
 
-        //     let sendMultiple = [];
+        let sendMultiple = [];
+        if (!requestedList.length) {
+            NotificationManager.warning("No requests!", "Warning");
+            return;
+        }
+        for (let i = 0; i < requestedList.length; i++) {
+            sendMultiple[i] = new anchor.BN(requestedList[i]['index']);
+        }
 
-        //     for (let i = 0; i < requestedList.length; i ++) {
-        //         sendMultiple[i] = requestedList[i]['index'];
-        //     }
+        try {
+            setIsLoading(true);
+            const provider = await getProvider()
 
-        //     try {
-        //         setIsLoading(true);
-        //         await cloriaSig.methods.approveTransferListRequest(sendMultiple)
-        //         .send({ from: ownerAddress })
-        //         .on('receipt', async(res) => {
-        //             NotificationManager.success("Sent successfully!", "Success");
-        //             await getRequestedList();
-        //             await getLatestItem();
-        //             setIsLoading(false);
-        //         })
-        //     } catch(err) {
-        //         NotificationManager.error("Transaction is failed!", "Failed");
-        //         await getRequestedList();
-        //         await getLatestItem();
-        //         setIsLoading(false);
-        //     }
+            await multisigProgram.rpc.declineTransferListRequest(provider.wallet.publicKey, sendMultiple, {
+                accounts: {
+                    transferAccount: transferKeypair.publicKey,
+                },
+            })
+
+            NotificationManager.success("Sent successfully!", "Success");
+            await getRequestedList();
+            await getLatestItem();
+            setIsLoading(false);
+        } catch (err) {
+            NotificationManager.error("Transaction is failed!", "Failed");
+            await getRequestedList();
+            await getLatestItem();
+            setIsLoading(false);
+        }
     }
 
     const importAirDropList = (e) => {
@@ -530,108 +583,108 @@ const Lawis = () => {
     }
 
     const approveBurnRequest = async () => {
-        //     if (!isConnected) {
-        //         NotificationManager.warning("Metamask is not connected!", "Warning");
-        //         return;
-        //     }
-        //     setIsLoading(true);
+        if (!isConnected) {
+            NotificationManager.warning("Phantom is not connected!", "Warning");
+            return;
+        }
+        setIsLoading(true);
 
-        //     try {
-        //         await cloriaSig.methods.approveBurnRequest()
-        //         .send({ from: ownerAddress })
-        //         .on('receipt', receipt => {
-        //             NotificationManager.success("Burned successfully", "Success");
-        //             setReqeustBurn(false);
-        //             setIsLoading(false);
-        //         })
-        //     } catch(err) {
-        //         if (err) {
-        //             setReqeustBurn(false);
-        //             setIsLoading(false);
-        //             NotificationManager.error("Burn failed", "Failed");
-        //         }
-        //     }
+        try {
+            //         await cloriaSig.methods.approveBurnRequest()
+            //         .send({ from: ownerAddress })
+            //         .on('receipt', receipt => {
+            NotificationManager.success("Burned successfully", "Success");
+            // setReqeustBurn(false);
+            setIsLoading(false);
+            //         })
+        } catch (err) {
+            if (err) {
+                //             setReqeustBurn(false);
+                setIsLoading(false);
+                NotificationManager.error("Burn failed", "Failed");
+            }
+        }
     }
 
     const declineBurnRequest = async () => {
-        //     if (!isConnected) {
-        //         NotificationManager.warning("No requested", "Warning");
-        //         return;
-        //     }
+        if (!isConnected) {
+            NotificationManager.warning("No requested", "Warning");
+            return;
+        }
 
-        //     setIsLoading(true);
+        setIsLoading(true);
 
-        //     try {
-        //         console.log(web3.utils.toWei(burnAmount.toString(),"mwei"), ownerAddress);
+        try {
+            //         console.log(web3.utils.toWei(burnAmount.toString(),"mwei"), ownerAddress);
 
-        //         await cloriaSig.methods.declineBurnRequest()
-        //         .send({ from: ownerAddress })
-        //         .on('receipt', (res) => {
-        //             NotificationManager.success("Declined successfully", "Success");
-        //             setReqeustBurn(false);
-        //             setIsLoading(false);
-        //         }).catch(err => {
-        //             console.log(err);
-        //         })
-        //     } catch(err) {
-        //         console.log(err);
-        //         if (err) {
-        //             setReqeustBurn(false);
-        //             NotificationManager.error("Declined failed", "Failed");
-        //             setIsLoading(false);
-        //         }
-        //     }
+            //         await cloriaSig.methods.declineBurnRequest()
+            //         .send({ from: ownerAddress })
+            //         .on('receipt', (res) => {
+            NotificationManager.success("Declined successfully", "Success");
+            //             setReqeustBurn(false);
+            setIsLoading(false);
+            //         }).catch(err => {
+            //             console.log(err);
+            //         })
+        } catch (err) {
+            console.log(err);
+            if (err) {
+                //             setReqeustBurn(false);
+                NotificationManager.error("Declined failed", "Failed");
+                setIsLoading(false);
+            }
+        }
     }
 
     const AirDrop = async () => {
-        //     if (!isConnected) {
-        //         NotificationManager.warning("Metamask is not connected!", "Warning");
-        //         return;
-        //     }
+        if (!isConnected) {
+            NotificationManager.warning("Phantom is not connected!", "Warning");
+            return;
+        }
 
-        //     if (!airDropList.length) {
-        //         NotificationManager.warning("No air drop list", "Warning");
-        //         return;
-        //     }
+        if (!airDropList.length) {
+            NotificationManager.warning("No air drop list", "Warning");
+            return;
+        }
 
         //     let chunkList = [];
         //     let totalBalance = 0;
-        //     setIsLoading(true);
+        setIsLoading(true);
         //     console.log(airDropList);
-        //     try {
-        //         for (let i = 0; i < airDropList.length; i ++) {
-        //             chunkList[i] = {};
-        //             totalBalance += Number(airDropList[i].balances);
-        //             chunkList[i]["addresses"] = airDropList[i].addresses;
-        //             chunkList[i]["balances"] = web3.utils.toWei(airDropList[i].balances, 'mwei');
-        //         }
+        try {
+            //         for (let i = 0; i < airDropList.length; i ++) {
+            //             chunkList[i] = {};
+            //             totalBalance += Number(airDropList[i].balances);
+            //             chunkList[i]["addresses"] = airDropList[i].addresses;
+            //             chunkList[i]["balances"] = web3.utils.toWei(airDropList[i].balances, 'mwei');
+            //         }
 
-        //         const ownerBalance = await cloria.methods.balanceOf(ownerAddress).call();
-        //         if (ownerBalance <= totalBalance) {
-        //             NotificationManager.warning("Balance is not enough", "Warning");
-        //             return;
-        //         }
-        //         totalBalance = Math.ceil(totalBalance);
-        //         await cloria.methods.approve(SigAddress, web3.utils.toWei(totalBalance.toString(), "mwei"))
-        //         .send({ from: ownerAddress })
-        //         .on('receipt', async(res) => {                
-        //             await cloriaSig.methods.airDrop(chunkList)
-        //             .send({ from : ownerAddress })
-        //             .on('receipt', res => {
-        //                 NotificationManager.success("Airdropped successfully!", "Success");
-        //                 setIsLoading(false);
-        //                 setAirDropList([]);
-        //             })
-        //             .catch(err => console.log)
-        //         })
-        //     } catch(err) {
-        //         console.log(err);
-        //         if (err) {
-        //             NotificationManager.error("Airdropped failed!", "Failed");
-        //             setIsLoading(false);
-        //             setAirDropList([]);
-        //         }
-        //     }
+            //         const ownerBalance = await cloria.methods.balanceOf(ownerAddress).call();
+            //         if (ownerBalance <= totalBalance) {
+            //             NotificationManager.warning("Balance is not enough", "Warning");
+            //             return;
+            //         }
+            //         totalBalance = Math.ceil(totalBalance);
+            //         await cloria.methods.approve(SigAddress, web3.utils.toWei(totalBalance.toString(), "mwei"))
+            //         .send({ from: ownerAddress })
+            //         .on('receipt', async(res) => {                
+            //             await cloriaSig.methods.airDrop(chunkList)
+            //             .send({ from : ownerAddress })
+            //             .on('receipt', res => {
+            NotificationManager.success("Airdropped successfully!", "Success");
+            setIsLoading(false);
+            setAirDropList([]);
+            //             })
+            //             .catch(err => console.log)
+            //         })
+        } catch (err) {
+            console.log(err);
+            if (err) {
+                NotificationManager.error("Airdropped failed!", "Failed");
+                setIsLoading(false);
+                setAirDropList([]);
+            }
+        }
     }
 
     const walletConnect = async () => {
@@ -652,7 +705,7 @@ const Lawis = () => {
         }
         // if (web3) {
         //     if (!window.ethereum) {
-        //         NotificationManager.warning("Metamask is not installed", "Warning");
+        //         NotificationManager.warning("Phantom is not installed", "Warning");
         //         return;
         //     }
         //     else {
@@ -665,20 +718,24 @@ const Lawis = () => {
         // }
     }
 
-    // const getLatestItem = async() => {
-    //     const transfer = await cloriaSig.methods.getLatestTransferRequest().call({ from: ownerAddress });
-    //     if (transfer.item.isActive) {
-    //         setEndTransferRequest(transfer.item);
-    //         setDecTransferNumber(transfer.cancel);
-    //     }
-
-    //     const burn = await cloriaSig.methods.getBurnRequest().call();
-    //     console.log(burn);
-    //     if (burn.item.isActive) {
-    //         setEndBurnRequest(burn.item);
-    //         setDecBurnNumber(burn.cancel);
-    //     }
-    // }
+    const getLatestItem = async () => {
+        const transfer = await multisigProgram.account.requestStructList.fetch(transferKeypair.publicKey);
+        const requestList = transfer.list.filter(item => item.isClosed === false && item.isSent === false);
+        if (requestList.length) {
+            setEndTransferRequest(requestList[requestList.length - 1]);
+            console.log("endRequest=>", requestList[requestList.length - 1])
+            setEndTransferRequestIdx(requestList[requestList.length - 1].index);
+        } else {
+            setEndTransferRequest(null);
+            setEndTransferRequestIdx(null);
+        }
+        // const burn = await cloriaSig.methods.getBurnRequest().call();
+        // console.log(burn);
+        // if (burn.item.isActive) {
+        //     setEndBurnRequest(burn.item);
+        //     setDecBurnNumber(burn.cancel);
+        // }
+    }
     return (
         <>
             <NotificationContainer />
@@ -1008,8 +1065,8 @@ const Lawis = () => {
                                     return (
                                         <tr key={idx}>
                                             <td>{idx + 1}</td>
-                                            <td>{item.account.to.toString()}</td>
-                                            <td>{item.account.value.toNumber()}</td>
+                                            <td>{item.to.toString()}</td>
+                                            <td>{item.value.toNumber()}</td>
                                         </tr>
                                     )
                                 })
@@ -1106,10 +1163,10 @@ const Lawis = () => {
                                     return (
                                         <tr key={idx}>
                                             <td>{idx + 1}</td>
-                                            <td>{item.account.createdBy.toString().substr(0, 6) + ' . . . ' + item.account.createdBy.toString().substr(-5)}</td>
-                                            <td>{item.account.to.toString().substr(0, 6) + ' . . . ' + item.account.to.toString().substr(-5)}</td>
-                                            <td>{item.account.dealedBy.toString().substr(0, 6) + ' . . . ' + item.account.dealedBy.toString().substr(-5)}</td>
-                                            <td>{item.account.value.toNumber()}</td>
+                                            <td>{item.createdBy.toString().substr(0, 6) + ' . . . ' + item.createdBy.toString().substr(-5)}</td>
+                                            <td>{item.to.toString().substr(0, 6) + ' . . . ' + item.to.toString().substr(-5)}</td>
+                                            <td>{item.dealedBy.toString().substr(0, 6) + ' . . . ' + item.dealedBy.toString().substr(-5)}</td>
+                                            <td>{item.value.toNumber()}</td>
                                         </tr>
                                     )
                                 })
