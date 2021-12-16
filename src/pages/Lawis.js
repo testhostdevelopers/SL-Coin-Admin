@@ -188,7 +188,7 @@ const Lawis = () => {
 
         setIsLoading(true);
         try {
-            const _transferAccount = transferKeypair;
+            const _transferAccount = web3.Keypair.generate();
             const provider = await getProvider()
             const fromTokenAccount = await starlightToken.getOrCreateAssociatedAccountInfo(
                 ownerAddress
@@ -212,24 +212,24 @@ const Lawis = () => {
             
             console.log(_transfer_list[_transfer_list.length-1].publicKey.toString())
             
-            if (_transfer_list.length == 0) {
-                console.log(1)
-                await multisigProgram.rpc.createTransferRequest(ownerAddress, new web3.PublicKey(transferAddress), _value, {
-                    accounts: {
-                        transferAccount: _transferAccount.publicKey,
-                        user: provider.wallet.publicKey,
-                        systemProgram: web3.SystemProgram.programId,
-                    },
-                    signers: [_transferAccount]
-                });
-            } else {
-                console.log(2)
-                await multisigProgram.rpc.addTransferRequest(ownerAddress, new web3.PublicKey(transferAddress), _value, {
-                    accounts: {
-                        transferAccount: transferKeypair.publicKey,
-                    },
-                });
-            }
+            await multisigProgram.rpc.createTransferRequest(ownerAddress, new web3.PublicKey(transferAddress), _value, {
+                accounts: {
+                    transferAccount: _transferAccount.publicKey,
+                    user: provider.wallet.publicKey,
+                    systemProgram: web3.SystemProgram.programId,
+                },
+                signers: [_transferAccount]
+            });
+            // if (_transfer_list.length == 0) {
+            //     console.log(1)
+            // } else {
+            //     console.log(2)
+            //     await multisigProgram.rpc.addTransferRequest(ownerAddress, new web3.PublicKey(transferAddress), _value, {
+            //         accounts: {
+            //             transferAccount: transferKeypair.publicKey,
+            //         },
+            //     });
+            // }
 
             setTransferAddress('');
             setTransferAmount('');
